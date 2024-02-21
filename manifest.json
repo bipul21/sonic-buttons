@@ -1,0 +1,23 @@
+{
+  "name": "Sonic Buttons",
+  "description": "Create Buttons for Github action based buttons",
+  "version": "1.0",
+  "manifest_version": 3,
+  "author": "Bipul Jain",
+  "action": {
+    "default_popup": "hello.html"
+  },
+  "permissions": ["tabs", "*://*.github.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["*://*.github.com/*/*/pull/*"],
+      "js": ["github-sonic-button.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "assets/icon-16.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  }
+}
