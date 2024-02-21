@@ -7,7 +7,10 @@
   "action": {
     "default_popup": "hello.html"
   },
-  "permissions": ["tabs", "*://*.github.com/*"],
+  "permissions": ["tabs"],
+  "host_permissions": [
+    "*://*.github.com/*"
+  ],
   "content_scripts": [
     {
       "matches": ["*://*.github.com/*/*/pull/*"],
