@@ -2,7 +2,6 @@ console.log("Running Sonic Buttons Code");
 
 function sonicButtonClick(event) {
     const commentString = event.target.textContent;
-    console.log("Sonic Button clicked with text ", event.target.textContent);
     document.getElementById('partial-new-comment-form-actions')
     document.getElementById('new_comment_field').value = commentString;
     document.getElementById("new_comment_form").submit();
@@ -17,7 +16,6 @@ chrome.storage.local.get(['userMessage'], function (result) {
     if (result.userMessage) {
         commentButtonTexts = result.userMessage.split(",").map(e => e.trim());
     }
-
     const sonicButtonDiv = document.createElement("div");
     sonicButtonDiv.className = "d-flex ml-2 pl-7"; // Set class attribute
 

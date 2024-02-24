@@ -5,10 +5,13 @@
   </head>
   <body style="width:300px; height:150px; font-size: 16px;">
     <h3>Sonic Buttons for Github</h3>
-    <h6>Add Common Action Button Keyword to Github Pull Request Pages</h6>
-    <h6>ex: RUN_SCA, RUN_UNIT_TEST</h6>
-
-    <input type="text" id="userMessageInput" placeholder="Enter custom codes! (comma sep)">
-    <button id="sendMessageBtn">Save custom codes</button>
+    <h5>Add Common Action Button Keyword to Github Pull Request Pages</h5>
+<!--    <h6>ex: RUN_SCA, RUN_UNIT_TEST</h6>-->
+      <ol id="existing_codes" style="padding-left:18px; font-size: 14px;">
+      </ol>
+    <form style="padding-bottom:10px;">
+      <input type="text" id="userMessageInput" placeholder="Enter Text to comment!" autocomplete="off" autofocus="autofocus">
+      <button id="sendMessageBtn" type="submit">Add</button>
+    </form>
   </body>
 </html>
