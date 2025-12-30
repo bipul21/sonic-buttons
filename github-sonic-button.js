@@ -17,7 +17,7 @@ chrome.storage.local.get(['userMessage'], function (result) {
         commentButtonTexts = result.userMessage.split(",").map(e => e.trim());
     }
     const sonicButtonDiv = document.createElement("div");
-    sonicButtonDiv.className = "d-flex ml-2 pl-7"; // Set class attribute
+    sonicButtonDiv.className = "d-flex ml-2 pl-7 flex-wrap"; // Set class attribute
 
     for (let i = 0; i < commentButtonTexts.length; i++) {
         const commentButtonText = commentButtonTexts[i]
