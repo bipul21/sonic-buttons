@@ -1,5 +1,13 @@
 console.log("Running Sonic Buttons Code");
 
+const PRESETS = [
+    { label: "RUN_FRONTEND_CHECKS",   codes: ["RUN_COVERAGE_CHECK", "RUN_FRONTEND_VALIDATION", "RUN_SCA"] },
+    { label: "RUN_TESTSTACK_CHECKS",  codes: ["RUN_SCA", "RUN_SYNTAX_CHECK", "RUN_UNIT_TEST", "RUN_OPENAPI_CHECK"] },
+    { label: "RUN_TESTHUB_CHECKS",    codes: ["RUN_SCA", "RUN_CHECKS", "RUN_UNIT_TESTS", "RUN_API_TESTS"] },
+    { label: "RUN_SDK_CHECKS",        codes: ["RUN_SCA"] },
+    { label: "RUN_AUTOMATION_CHECKS", codes: ["RUN_QUALITY_CHECKS"] },
+];
+
 async function submitSelectedCodes(codes, submitBtn) {
     if (!codes || codes.length === 0) return;
     const field = document.getElementById('new_comment_field');
@@ -73,7 +81,12 @@ async function submitSelectedCodes(codes, submitBtn) {
 
 function buildCustomDropdown(codes) {
     const wrapper = document.createElement("div");
-    wrapper.className = "d-flex flex-items-center";
+    wrapper.className = "d-flex flex-column flex-items-center";
+    wrapper.style.paddingTop = "6px";
+    wrapper.style.gap = "4px";
+
+    const topRow = document.createElement("div");
+    topRow.className = "d-flex flex-items-center";
 
     const details = document.createElement("details");
     details.className = "details-reset details-overlay position-relative";
@@ -86,7 +99,7 @@ function buildCustomDropdown(codes) {
     summary.style.justifyContent = "space-between";
 
     const summaryLabel = document.createElement("span");
-    summaryLabel.textContent = "Sonic";
+    summaryLabel.textContent = "Custom";
     const summaryCaret = document.createElement("span");
     summaryCaret.textContent = "▾";
     summary.appendChild(summaryLabel);
@@ -94,14 +107,19 @@ function buildCustomDropdown(codes) {
 
     details.appendChild(summary);
 
+    function updateSelectedCount() {
+        const count = list.querySelectorAll('input[type="checkbox"]:checked').length;
+        summaryLabel.textContent = count > 0 ? `Custom (${count})` : "Custom";
+    }
+
     const menu = document.createElement("div");
     menu.className = "SelectMenu position-absolute";
     menu.style.zIndex = "100";
-    menu.style.marginTop = "4px";
 
     const modal = document.createElement("div");
     modal.className = "SelectMenu-modal";
     modal.style.minWidth = "300px";
+    modal.style.marginTop = "0.25rem";
 
     const list = document.createElement("div");
     list.className = "SelectMenu-list";
@@ -126,10 +144,12 @@ function buildCustomDropdown(codes) {
         list.appendChild(label);
     }
 
+    list.addEventListener("change", updateSelectedCount);
+
     modal.appendChild(list);
     menu.appendChild(modal);
     details.appendChild(menu);
-    wrapper.appendChild(details);
+    topRow.appendChild(details);
 
     const submitBtn = document.createElement("button");
     submitBtn.type = "button";
@@ -140,7 +160,46 @@ function buildCustomDropdown(codes) {
         const selected = Array.from(checked).map(c => c.value);
         submitSelectedCodes(selected, submitBtn);
     });
-    wrapper.appendChild(submitBtn);
+    topRow.appendChild(submitBtn);
+
+    wrapper.appendChild(topRow);
+
+    const branding = document.createElement("div");
+    branding.className = "d-flex flex-items-center color-fg-muted";
+    branding.style.gap = "6px";
+    branding.style.fontSize = "12px";
+
+    const brandingIcon = document.createElement("img");
+    brandingIcon.src = chrome.runtime.getURL("assets/icon-16.png");
+    brandingIcon.alt = "";
+    brandingIcon.style.width = "16px";
+    brandingIcon.style.height = "16px";
+
+    const brandingText = document.createElement("span");
+    brandingText.textContent = "Sonic Buttons";
+
+    branding.appendChild(brandingIcon);
+    branding.appendChild(brandingText);
+    wrapper.appendChild(branding);
+
+    return wrapper;
+}
+
+function buildPresets() {
+    const wrapper = document.createElement("div");
+    wrapper.className = "d-flex flex-wrap flex-items-center";
+    wrapper.style.gap = "4px";
+
+    for (const preset of PRESETS) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn";
+        btn.textContent = preset.label;
+        btn.addEventListener("click", function () {
+            submitSelectedCodes(preset.codes, btn);
+        });
+        wrapper.appendChild(btn);
+    }
 
     return wrapper;
 }
@@ -154,10 +213,22 @@ chrome.storage.local.get(['userMessage'], function (result) {
     }
 
     const sonicContainer = document.createElement("div");
-    sonicContainer.className = "d-flex flex-items-center flex-justify-end";
-    sonicContainer.style.padding = "8px 0";
+    sonicContainer.className = "d-flex flex-items-start flex-justify-between ml-6 pl-7";
+    sonicContainer.style.paddingTop = "8px";
+    sonicContainer.style.paddingBottom = "8px";
+    sonicContainer.style.gap = "8px";
 
-    sonicContainer.appendChild(buildCustomDropdown(commentButtonTexts));
+    const separator = document.createElement("div");
+    separator.style.width = "1px";
+    separator.style.alignSelf = "stretch";
+    separator.style.backgroundColor = "var(--color-border-default, #d0d7de)";
+
+    const presetCodes = PRESETS.flatMap(p => p.codes);
+    const dropdownCodes = [...new Set([...commentButtonTexts, ...presetCodes])];
+
+    sonicContainer.appendChild(buildPresets());
+    sonicContainer.appendChild(separator);
+    sonicContainer.appendChild(buildCustomDropdown(dropdownCodes));
 
     parentDiv.insertBefore(sonicContainer, parentDiv.firstChild);
 });
