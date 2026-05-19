@@ -35,11 +35,18 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab){
 //setTimeout(throwAnException, 2000);
 
 
+// GA4 event params must be primitives (string/number/bool); arrays/objects
+// are silently dropped, so callers should pre-join lists into strings.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message) return;
+  if (message.sonicEvent && typeof message.sonicEvent === 'string') {
+    Analytics.fireEvent(message.sonicEvent, message.params || {});
+    return;
+  }
+  // Legacy shapes — kept so older content-script builds still report.
   if (message.sonicButtonClick) {
-//    console.log("Coming in event listener background worker");
-    Analytics.fireEvent('sonicButtonClick', {name: message.sonicButtonClick});
-  }else if(message.sonicButtonShown) {
+    Analytics.fireEvent('sonicButtonClick', { name: message.sonicButtonClick });
+  } else if (message.sonicButtonShown) {
     Analytics.fireEvent('sonicButtonShown');
   }
 });
