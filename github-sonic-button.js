@@ -382,12 +382,8 @@ function renderSonicContainer(parentDiv, codes) {
     return sonicContainer;
 }
 
-(async function init() {
-    injectStyles();
-    const parentDiv = await waitForElement("#issue-comment-box", 30000);
-    if (!parentDiv) return;
-
-    const stored = await new Promise(r => {
+function getStoredCodes() {
+    return new Promise(r => {
         chrome.storage.local.get(['userMessage'], result => {
             const codes = (result && result.userMessage)
                 ? result.userMessage.split(",").map(e => e.trim()).filter(Boolean)
@@ -395,10 +391,38 @@ function renderSonicContainer(parentDiv, codes) {
             r(codes);
         });
     });
+}
 
-    let detected = detectCodesFromChecks();
-    let codes = detected.length > 0 ? detected : stored;
-    let source = detected.length > 0 ? 'detection' : (stored.length > 0 ? 'fallback' : 'none');
+let activeDetectionObserver = null;
+function watchForLateCodes(parentDiv, initialCodes) {
+    if (activeDetectionObserver) activeDetectionObserver.disconnect();
+    const start = Date.now();
+    let codes = initialCodes;
+    const obs = new MutationObserver(() => {
+        if (Date.now() - start > DETECTION_WAIT_MS) { obs.disconnect(); return; }
+        const found = detectCodesFromChecks();
+        if (found.length === 0) return;
+        if (found.join("|") === codes.join("|")) { obs.disconnect(); return; }
+        const container = document.getElementById(CONTAINER_ID);
+        const anyChecked = container && container.querySelector('input[type=checkbox]:checked');
+        if (!anyChecked && parentDiv.isConnected) {
+            codes = found;
+            renderSonicContainer(parentDiv, codes);
+            track('sonic_codes_updated', { count: codes.length, codes: codes.join(',') });
+        }
+        obs.disconnect();
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+    activeDetectionObserver = obs;
+    setTimeout(() => obs.disconnect(), DETECTION_WAIT_MS);
+}
+
+async function mount(parentDiv) {
+    const stored = await getStoredCodes();
+    const detected = detectCodesFromChecks();
+    const codes = detected.length > 0 ? detected : stored;
+    const source = detected.length > 0 ? 'detection' : (stored.length > 0 ? 'fallback' : 'none');
+    if (!parentDiv.isConnected) return;
     renderSonicContainer(parentDiv, codes);
 
     track('sonic_codes_detected', {
@@ -407,29 +431,39 @@ function renderSonicContainer(parentDiv, codes) {
         codes: codes.join(','),
     });
 
-    if (detected.length === 0) {
-        const start = Date.now();
-        const obs = new MutationObserver(() => {
-            if (Date.now() - start > DETECTION_WAIT_MS) {
-                obs.disconnect();
-                return;
-            }
-            const found = detectCodesFromChecks();
-            if (found.length === 0) return;
-            if (found.join("|") === codes.join("|")) {
-                obs.disconnect();
-                return;
-            }
-            const container = document.getElementById(CONTAINER_ID);
-            const anyChecked = container && container.querySelector('input[type=checkbox]:checked');
-            if (!anyChecked) {
-                codes = found;
-                renderSonicContainer(parentDiv, codes);
-                track('sonic_codes_updated', { count: codes.length, codes: codes.join(',') });
-            }
-            obs.disconnect();
-        });
-        obs.observe(document.body, { childList: true, subtree: true });
-        setTimeout(() => obs.disconnect(), DETECTION_WAIT_MS);
+    if (detected.length === 0) watchForLateCodes(parentDiv, codes);
+}
+
+let mounting = false;
+async function tryMount() {
+    if (mounting) return;
+    const parentDiv = document.getElementById("issue-comment-box");
+    if (!parentDiv) return;
+    const existing = document.getElementById(CONTAINER_ID);
+    if (existing && parentDiv.contains(existing)) return;
+    mounting = true;
+    try {
+        await mount(parentDiv);
+    } finally {
+        mounting = false;
     }
+}
+
+(async function init() {
+    injectStyles();
+
+    // Initial mount: wait up to 30s for the comment box to appear.
+    const parentDiv = await waitForElement("#issue-comment-box", 30000);
+    if (parentDiv) await tryMount();
+
+    // GitHub uses Turbo for SPA navigation between PR tabs (Conversation,
+    // Files Changed, Commits). The DOM is swapped without a full reload, so
+    // re-mount our buttons whenever navigation completes or the comment box
+    // re-appears in the DOM.
+    ['turbo:load', 'turbo:render', 'turbo:frame-render', 'pjax:end', 'pjax:success'].forEach(evt => {
+        document.addEventListener(evt, tryMount);
+    });
+    window.addEventListener('popstate', tryMount);
+
+    new MutationObserver(tryMount).observe(document.body, { childList: true, subtree: true });
 })();
