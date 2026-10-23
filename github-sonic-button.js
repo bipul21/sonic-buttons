@@ -66,13 +66,43 @@ function injectStyles() {
     document.head.appendChild(style);
 }
 
+// GitHub's React merge box loads its checks from this same-origin endpoint.
+// Reading it directly works even when the checks list is collapsed (GitHub
+// doesn't render the rows when every check passes) and doesn't depend on
+// GitHub's hashed CSS-module class names.
+async function fetchCodesFromStatusChecks() {
+    const prPath = (location.pathname.match(/^\/[^/]+\/[^/]+\/pull\/\d+/) || [])[0];
+    if (!prPath) return [];
+    try {
+        const response = await fetch(`${location.origin}${prPath}/page_data/status_checks`, {
+            credentials: 'same-origin',
+            // Without X-Requested-With GitHub answers 406.
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (!response.ok) return [];
+        const data = await response.json();
+        const seen = new Set();
+        (data.statusChecks || []).forEach(check => {
+            const text = `${check.displayName || ''} ${check.description || ''}`;
+            (text.match(/\bRUN_[A-Z][A-Z0-9_]*\b/g) || []).forEach(m => seen.add(m));
+        });
+        return Array.from(seen);
+    } catch (err) {
+        console.error("Sonic Buttons: failed to fetch status checks", err);
+        return [];
+    }
+}
+
+// DOM fallback, used when the endpoint fails and for checks that appear
+// after mount. Only sees check rows while the checks list is expanded.
 function detectCodesFromChecks() {
     const scopes = new Set();
     [
         '.merge-status-list',
         '.merge-status-item',
         '.branch-action-item',
-        '[class*="MergeBox"]',
+        '[data-testid="mergebox-partial"]',
+        'section[aria-label="Checks"]',
     ].forEach(sel => {
         document.querySelectorAll(sel).forEach(n => scopes.add(n));
     });
@@ -418,8 +448,8 @@ function watchForLateCodes(parentDiv, initialCodes) {
 }
 
 async function mount(parentDiv) {
-    const stored = await getStoredCodes();
-    const detected = detectCodesFromChecks();
+    const [stored, fetched] = await Promise.all([getStoredCodes(), fetchCodesFromStatusChecks()]);
+    const detected = fetched.length > 0 ? fetched : detectCodesFromChecks();
     const codes = detected.length > 0 ? detected : stored;
     const source = detected.length > 0 ? 'detection' : (stored.length > 0 ? 'fallback' : 'none');
     if (!parentDiv.isConnected) return;
@@ -428,6 +458,7 @@ async function mount(parentDiv) {
     track('sonic_codes_detected', {
         count: codes.length,
         source,
+        detector: fetched.length > 0 ? 'status_checks' : 'dom',
         codes: codes.join(','),
     });
 
